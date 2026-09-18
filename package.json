@@ -1,0 +1,12 @@
+{
+  "name": "sport-api",
+  "version": "1.1.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@azure/cosmos": "^4.2.0",
+    "@azure/identity": "^4.5.0"
+  }
+}
