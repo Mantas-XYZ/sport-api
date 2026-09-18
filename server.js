@@ -1,4 +1,6 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { randomUUID } = require('crypto');
 const { CosmosClient } = require('@azure/cosmos');
 const { DefaultAzureCredential } = require('@azure/identity');
@@ -12,6 +14,10 @@ const container = new CosmosClient({ endpoint: process.env.COSMOS_ENDPOINT, aadC
   .container(process.env.COSMOS_CONTAINER || 'workouts');
 
 const SPORTS = ['Running', 'Cycling', 'Swimming', 'Gym', 'Football'];
+
+// The frontend is served from the same origin as the API, so the platform
+// sign-in session covers both and no cross-origin access is needed.
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
 
 function send(res, status, body) {
   res.writeHead(status, {
@@ -45,6 +51,16 @@ http.createServer(async (req, res) => {
   try {
     if (req.method === 'OPTIONS') return send(res, 204);
     if (url.pathname === '/health') return send(res, 200, { ok: true });
+
+    if ((url.pathname === '/' || url.pathname === '/index.html') && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'same-origin',
+      });
+      return res.end(INDEX_HTML);
+    }
 
     if (url.pathname === '/api/workouts' && req.method === 'GET') {
       const { resources } = await container.items

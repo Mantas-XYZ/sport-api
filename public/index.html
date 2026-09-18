@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workout Log</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#fff; --text:#1f2933; --muted:#667085; --accent:#16a34a; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:560px; margin:0 auto; }
+  h1 { margin:0 0 4px; }
+  p.sub { margin:0 0 20px; color:var(--muted); }
+  .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  label { display:flex; flex-direction:column; font-size:13px; color:var(--muted); gap:4px; }
+  input, select { padding:8px; border:1px solid #d0d5dd; border-radius:8px; font-size:15px; }
+  button { grid-column:1/-1; padding:10px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-size:15px; cursor:pointer; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center; }
+  .stats b { display:block; font-size:22px; }
+  .stats span { font-size:12px; color:var(--muted); }
+  ul { list-style:none; padding:0; margin:0; }
+  li { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eef0f3; }
+  li:last-child { border-bottom:0; }
+  li small { color:var(--muted); }
+  li button { background:none; color:#b42318; padding:4px 8px; width:auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🏃 Workout Log</h1>
+  <p class="sub">Track your training sessions. <span id="status"></span></p>
+
+  <section class="card">
+    <form id="form">
+      <label>Sport
+        <select id="sport">
+          <option>Running</option><option>Cycling</option><option>Swimming</option><option>Gym</option><option>Football</option>
+        </select>
+      </label>
+      <label>Minutes <input id="minutes" type="number" min="1" required></label>
+      <label>Distance (km) <input id="distance" type="number" min="0" step="0.1" value="0"></label>
+      <label>Date <input id="date" type="date" required></label>
+      <button type="submit">Add workout</button>
+    </form>
+  </section>
+
+  <section class="card stats">
+    <div><b id="count">0</b><span>Workouts</span></div>
+    <div><b id="time">0</b><span>Minutes</span></div>
+    <div><b id="km">0</b><span>Km</span></div>
+  </section>
+
+  <section class="card"><ul id="list"></ul></section>
+</main>
+<script>
+  const API = '/api/workouts';
+  let workouts = [];
+  const status = document.getElementById('status');
+  document.getElementById('date').valueAsDate = new Date();
+
+  async function api(method, path = '', body) {
+    const res = await fetch(API + path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error(res.status);
+    return res.status === 204 ? null : res.json();
+  }
+
+  async function refresh() {
+    try {
+      status.textContent = 'Loading…';
+      workouts = await api('GET');
+      status.textContent = 'Saved in Azure Cosmos DB';
+    } catch (e) {
+      status.textContent = 'Could not reach the API (it may be waking up — try again).';
+    }
+    render();
+  }
+
+  function render() {
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+    workouts.forEach(w => {
+      const li = document.createElement('li');
+      li.innerHTML = '<div><strong></strong><br><small></small></div><button aria-label="Delete">✕</button>';
+      li.querySelector('strong').textContent = w.sport;
+      li.querySelector('small').textContent = w.date + ' · ' + w.minutes + ' min · ' + w.distance + ' km';
+      li.querySelector('button').onclick = async () => {
+        try { await api('DELETE', '/' + w.id); } catch { status.textContent = 'Delete failed.'; }
+        refresh();
+      };
+      list.appendChild(li);
+    });
+    if (!workouts.length) list.innerHTML = '<li><small>No workouts yet.</small></li>';
+    document.getElementById('count').textContent = workouts.length;
+    document.getElementById('time').textContent = workouts.reduce((s, w) => s + w.minutes, 0);
+    document.getElementById('km').textContent = workouts.reduce((s, w) => s + w.distance, 0).toFixed(1);
+  }
+
+  document.getElementById('form').onsubmit = async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      await api('POST', '', {
+        sport: document.getElementById('sport').value,
+        minutes: +document.getElementById('minutes').value,
+        distance: +document.getElementById('distance').value || 0,
+        date: document.getElementById('date').value,
+      });
+      e.target.reset();
+      document.getElementById('date').valueAsDate = new Date();
+    } catch { status.textContent = 'Save failed.'; }
+    btn.disabled = false;
+    refresh();
+  };
+  refresh();
+</script>
+</body>
+</html>
